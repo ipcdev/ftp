@@ -49,6 +49,10 @@ const timeFormat = "20060102150405"
 // ServerConn represents the connection to a remote FTP server.
 // A single connection only supports one in-flight data connection.
 // It is not safe to be called concurrently.
+//
+// ServerConn 表示与远程 FTP 服务器的连接。
+// 单个连接仅支持一个动态数据连接。
+// 并发调用是不安全的。
 type ServerConn struct {
 	options *dialOptions
 	conn    *textproto.Conn // connection wrapper for text protocol
@@ -66,11 +70,13 @@ type ServerConn struct {
 }
 
 // DialOption represents an option to start a new connection with Dial
+// DialOption 表示使用 Dial 启动新连接的选项
 type DialOption struct {
 	setup func(do *dialOptions)
 }
 
 // dialOptions contains all the options set by DialOption.setup
+// dialOptions 包含 DialOption.setup 设置的所有选项
 type dialOptions struct {
 	context         context.Context
 	dialer          net.Dialer
@@ -104,6 +110,7 @@ type Response struct {
 }
 
 // Dial connects to the specified address with optional options
+// Dial 通过可选选项连接到指定地址
 func Dial(addr string, options ...DialOption) (*ServerConn, error) {
 	do := &dialOptions{}
 	for _, option := range options {
@@ -111,6 +118,7 @@ func Dial(addr string, options ...DialOption) (*ServerConn, error) {
 	}
 
 	if do.location == nil {
+		// 设置默认时区
 		do.location = time.UTC
 	}
 
@@ -180,6 +188,7 @@ func Dial(addr string, options ...DialOption) (*ServerConn, error) {
 }
 
 // DialWithTimeout returns a DialOption that configures the ServerConn with specified timeout
+// DialWithTimeout 返回一个 DialOption，为 ServerConn 配置指定的超时时间
 func DialWithTimeout(timeout time.Duration) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.dialer.Timeout = timeout
@@ -189,6 +198,8 @@ func DialWithTimeout(timeout time.Duration) DialOption {
 // DialWithShutTimeout returns a DialOption that configures the ServerConn with
 // maximum time to wait for the data closing status on control connection
 // and nudging the control connection deadline before reading status.
+//
+// DialWithShutTimeout 返回一个 DialOption，它配置 ServerConn 等待控制连接上的数据关闭状态的最长时间，并在读取状态之前微调控制连接的截止时间。
 func DialWithShutTimeout(shutTimeout time.Duration) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.shutTimeout = shutTimeout
@@ -196,6 +207,7 @@ func DialWithShutTimeout(shutTimeout time.Duration) DialOption {
 }
 
 // DialWithDialer returns a DialOption that configures the ServerConn with specified net.Dialer
+// DialWithDialer 返回一个 DialOption，使用指定的 net.Dialer 配置 ServerConn
 func DialWithDialer(dialer net.Dialer) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.dialer = dialer
@@ -213,6 +225,9 @@ func DialWithNetConn(conn net.Conn) DialOption {
 
 // DialWithDisabledEPSV returns a DialOption that configures the ServerConn with EPSV disabled
 // Note that EPSV is only used when advertised in the server features.
+//
+// DialWithDisabledEPSV 返回一个 DialOption，用于配置 ServerConn 禁用 EPSV
+// 请注意，EPSV 仅在服务器功能中公布时使用。
 func DialWithDisabledEPSV(disabled bool) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.disableEPSV = disabled
@@ -220,6 +235,7 @@ func DialWithDisabledEPSV(disabled bool) DialOption {
 }
 
 // DialWithDisabledUTF8 returns a DialOption that configures the ServerConn with UTF8 option disabled
+// DialWithDisabledUTF8 返回一个 DialOption，用于配置禁用 UTF8 选项的 ServerConn
 func DialWithDisabledUTF8(disabled bool) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.disableUTF8 = disabled
@@ -230,6 +246,10 @@ func DialWithDisabledUTF8(disabled bool) DialOption {
 //
 // This is useful for servers which advertise MLSD (eg some versions
 // of Serv-U) but don't support it properly.
+//
+// # DialWithDisabledMLSD 返回一个 DialOption，用于配置禁用 MLSD 选项的 ServerConn
+//
+// 这对于宣传 MLSD（例如某些版本的 Serv-U）但不能正确支持它的服务器很有用。
 func DialWithDisabledMLSD(disabled bool) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.disableMLSD = disabled
@@ -242,6 +262,12 @@ func DialWithDisabledMLSD(disabled bool) DialOption {
 // the MFMT command for setting file time like other servers but by default
 // uses the MDTM command with non-standard arguments for that.
 // See "mdtm_write" in https://security.appspot.com/vsftpd/vsftpd_conf.html
+//
+// # DialWithWritingMDTM 返回一个 DialOption 使得 ServerConn 使用 MDTM 设置文件时间
+//
+// 此选项解决了 VsFtpd 服务器中的一个怪癖，该服务器不支持像其他服务器一样使用 MFMT 命令来设置文件时间，
+// 但默认情况下使用带有非标准参数的 MDTM 命令。
+// 请参阅 https://security.appspot.com/vsftpd/vsftpd_conf.html 中的“mdtm_write”
 func DialWithWritingMDTM(enabled bool) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.writingMDTM = enabled
@@ -252,6 +278,10 @@ func DialWithWritingMDTM(enabled bool) DialOption {
 //
 // This is useful for servers that do not do this by default, but it forces the use of the LIST command
 // even if the server supports MLST.
+//
+// # DialWithForceListHidden 返回一个 DialOption，使 ServerConn 使用 LIST -a 在目录列表中包含隐藏文件和文件夹
+//
+// 这对于默认情况下不执行此操作的服务器很有用，但即使服务器支持 MLST，它也会强制使用 LIST 命令。
 func DialWithForceListHidden(enabled bool) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.forceListHidden = enabled
@@ -260,6 +290,8 @@ func DialWithForceListHidden(enabled bool) DialOption {
 
 // DialWithLocation returns a DialOption that configures the ServerConn with specified time.Location
 // The location is used to parse the dates sent by the server which are in server's timezone
+// DialWithLocation 返回一个 DialOption，它用指定的 time.Location 配置 ServerConn
+// 该位置用于解析服务器发送的处于服务器时区的日期
 func DialWithLocation(location *time.Location) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.location = location
@@ -268,6 +300,7 @@ func DialWithLocation(location *time.Location) DialOption {
 
 // DialWithContext returns a DialOption that configures the ServerConn with specified context
 // The context will be used for the initial connection setup
+// DialWithContext 返回一个 DialOption，它使用指定的上下文配置 ServerConn，该上下文将用于初始连接设置
 func DialWithContext(ctx context.Context) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.context = ctx
@@ -279,6 +312,10 @@ func DialWithContext(ctx context.Context) DialOption {
 // If called together with the DialWithDialFunc option, the DialWithDialFunc function
 // will be used when dialing new connections but regardless of the function,
 // the connection will be treated as a TLS connection.
+//
+// # DialWithTLS 返回一个 DialOption，它使用指定的 TLS 配置来配置 ServerConn
+//
+// 如果与 DialWithDialFunc 选项一起调用，则在拨打新连接时将使用 DialWithDialFunc 函数，但无论该函数如何，该连接都将被视为 TLS 连接。
 func DialWithTLS(tlsConfig *tls.Config) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.tlsConfig = tlsConfig
@@ -287,6 +324,8 @@ func DialWithTLS(tlsConfig *tls.Config) DialOption {
 
 // DialWithExplicitTLS returns a DialOption that configures the ServerConn to be upgraded to TLS
 // See DialWithTLS for general TLS documentation
+// DialWithExplicitTLS 返回一个 DialOption，用于将 ServerConn 配置为升级到 TLS
+// 有关一般 TLS 文档，请参阅 DialWithTLS
 func DialWithExplicitTLS(tlsConfig *tls.Config) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.explicitTLS = true
@@ -296,6 +335,7 @@ func DialWithExplicitTLS(tlsConfig *tls.Config) DialOption {
 
 // DialWithDebugOutput returns a DialOption that configures the ServerConn to write to the Writer
 // everything it reads from the server
+// DialWithDebugOutput 返回一个 DialOption，它配置 ServerConn 以将从服务器读取的所有内容写入 Writer
 func DialWithDebugOutput(w io.Writer) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.debugOutput = w
@@ -308,6 +348,10 @@ func DialWithDebugOutput(w io.Writer) DialOption {
 // If used together with the DialWithNetConn option, the DialWithNetConn
 // takes precedence for the control connection, while data connections will
 // be established using function specified with the DialWithDialFunc option
+//
+// # DialWithDialFunc 返回一个 DialOption，配置 ServerConn 使用指定的函数来建立控制和数据连接
+//
+// 如果与 DialWithNetConn 选项一起使用，则 DialWithNetConn 优先用于控制连接，而数据连接将使用 DialWithDialFunc 选项指定的函数建立
 func DialWithDialFunc(f func(network, address string) (net.Conn, error)) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.dialFunc = f
@@ -348,6 +392,10 @@ func DialTimeout(addr string, timeout time.Duration) (*ServerConn, error) {
 //
 // "anonymous"/"anonymous" is a common user/password scheme for FTP servers
 // that allows anonymous read-only accounts.
+//
+// Login 使用指定的用户和密码对客户端进行身份验证。
+//
+// "anonymous"/"anonymous" 是 FTP 服务器的常见 user/password 方案，允许匿名只读帐户。
 func (c *ServerConn) Login(user, password string) error {
 	code, message, err := c.cmd(-1, "USER %s", user)
 	if err != nil {
@@ -638,6 +686,7 @@ func (c *ServerConn) cmdDataConnFrom(offset uint64, format string, args ...inter
 }
 
 // Type switches the transfer mode for the connection.
+// Type 切换连接的传输模式。
 func (c *ServerConn) Type(transferType TransferType) (err error) {
 	_, _, err = c.cmd(StatusCommandOK, "TYPE "+string(transferType))
 	return err
@@ -724,6 +773,7 @@ func (c *ServerConn) List(path string) (entries []*Entry, err error) {
 // GetEntry issues a MLST FTP command which retrieves one single Entry using the
 // control connection. The returnedEntry will describe the current directory
 // when no path is given.
+// GetEntry 发出一条 MLST FTP 命令，该命令使用 控制连接 检索单个条目。 当没有给出路径时，返回的条目将描述当前目录。
 func (c *ServerConn) GetEntry(path string) (entry *Entry, err error) {
 	if !c.mlstSupported {
 		return nil, &textproto.Error{Code: StatusNotImplemented, Msg: StatusText(StatusNotImplemented)}
@@ -779,12 +829,14 @@ func (c *ServerConn) GetEntry(path string) (entry *Entry, err error) {
 
 // IsTimePreciseInList returns true if client and server support the MLSD
 // command so List can return time with 1-second precision for all files.
+// 如果客户端和服务器支持 MLSD 命令，则 IsTimePreciseInList 返回 true，因此 List 可以为所有文件返回 1 秒精度的时间。
 func (c *ServerConn) IsTimePreciseInList() bool {
 	return c.mlstSupported
 }
 
 // ChangeDir issues a CWD FTP command, which changes the current directory to
 // the specified path.
+// ChangeDir 发出 CWD FTP 命令，该命令将当前目录更改为指定路径。
 func (c *ServerConn) ChangeDir(path string) error {
 	_, _, err := c.cmd(StatusRequestedFileActionOK, "CWD %s", path)
 	return err
@@ -793,6 +845,8 @@ func (c *ServerConn) ChangeDir(path string) error {
 // ChangeDirToParent issues a CDUP FTP command, which changes the current
 // directory to the parent directory.  This is similar to a call to ChangeDir
 // with a path set to "..".
+//
+// ChangeDirToParent 发出 CDUP FTP 命令，该命令将当前目录更改为父目录。 这类似于调用 ChangeDir 并将路径设置为“..”。
 func (c *ServerConn) ChangeDirToParent() error {
 	_, _, err := c.cmd(StatusRequestedFileActionOK, "CDUP")
 	return err
@@ -800,6 +854,7 @@ func (c *ServerConn) ChangeDirToParent() error {
 
 // CurrentDir issues a PWD FTP command, which Returns the path of the current
 // directory.
+// 返回当前目录路径
 func (c *ServerConn) CurrentDir() (string, error) {
 	_, msg, err := c.cmd(StatusPathCreated, "PWD")
 	if err != nil {
@@ -817,6 +872,7 @@ func (c *ServerConn) CurrentDir() (string, error) {
 }
 
 // FileSize issues a SIZE FTP command, which Returns the size of the file
+// 返回文件大小
 func (c *ServerConn) FileSize(path string) (int64, error) {
 	_, msg, err := c.cmd(StatusFile, "SIZE %s", path)
 	if err != nil {
@@ -828,6 +884,7 @@ func (c *ServerConn) FileSize(path string) (int64, error) {
 
 // GetTime issues the MDTM FTP command to obtain the file modification time.
 // It returns a UTC time.
+// GetTime 发出 MDTM FTP 命令来获取文件修改时间。 它返回 UTC 时间。
 func (c *ServerConn) GetTime(path string) (time.Time, error) {
 	var t time.Time
 	if !c.mdtmSupported {
@@ -842,6 +899,7 @@ func (c *ServerConn) GetTime(path string) (time.Time, error) {
 
 // IsGetTimeSupported allows library callers to check in advance that they
 // can use GetTime to get file time.
+// IsGetTimeSupported 允许库调用者提前检查他们是否可以使用 GetTime 来获取文件时间。
 func (c *ServerConn) IsGetTimeSupported() bool {
 	return c.mdtmSupported
 }
@@ -865,6 +923,7 @@ func (c *ServerConn) SetTime(path string, t time.Time) (err error) {
 
 // IsSetTimeSupported allows library callers to check in advance that they
 // can use SetTime to set file time.
+// IsSetTimeSupported 允许库调用者提前检查他们是否可以使用 SetTime 设置文件时间。
 func (c *ServerConn) IsSetTimeSupported() bool {
 	return c.mfmtSupported || c.mdtmCanWrite
 }
@@ -873,6 +932,10 @@ func (c *ServerConn) IsSetTimeSupported() bool {
 // FTP server.
 //
 // The returned ReadCloser must be closed to cleanup the FTP data connection.
+//
+// Retr 发出 RETR FTP 命令以从远程 FTP 服务器获取指定文件。
+//
+// 必须关闭返回的 ReadCloser 以清理 FTP 数据连接。
 func (c *ServerConn) Retr(path string) (*Response, error) {
 	return c.RetrFrom(path, 0)
 }
@@ -881,6 +944,10 @@ func (c *ServerConn) Retr(path string) (*Response, error) {
 // FTP server, the server will not send the offset first bytes of the file.
 //
 // The returned ReadCloser must be closed to cleanup the FTP data connection.
+//
+// RetrFrom 发出 RETR FTP 命令从远程 FTP 服务器获取指定文件，服务器不会发送文件的偏移量第一个字节。
+//
+// 必须关闭返回的ReadCloser以清理FTP数据连接。
 func (c *ServerConn) RetrFrom(path string, offset uint64) (*Response, error) {
 	conn, err := c.cmdDataConnFrom(offset, "RETR %s", path)
 	if err != nil {
@@ -894,6 +961,10 @@ func (c *ServerConn) RetrFrom(path string, offset uint64) (*Response, error) {
 // Stor creates the specified file with the content of the io.Reader.
 //
 // Hint: io.Pipe() can be used if an io.Writer is required.
+//
+// Stor 发出 STOR FTP 命令将文件存储到远程 FTP 服务器。 Stor 使用 io.Reader 的内容创建指定文件。
+//
+// 提示：如果需要 io.Writer，可以使用 io.Pipe()。
 func (c *ServerConn) Stor(path string, r io.Reader) error {
 	return c.StorFrom(path, r, 0)
 }
@@ -921,6 +992,11 @@ func (c *ServerConn) checkDataShut() error {
 // on the server will start at the given file offset.
 //
 // Hint: io.Pipe() can be used if an io.Writer is required.
+//
+// StorFrom 发出 STOR FTP 命令将文件存储到远程 FTP 服务器。
+// Stor 使用 io.Reader 的内容创建指定的文件，在服务器上写入将从给定的文件偏移量开始。
+//
+// 提示：如果需要 io.Writer，可以使用 io.Pipe()。
 func (c *ServerConn) StorFrom(path string, r io.Reader, offset uint64) error {
 	conn, err := c.cmdDataConnFrom(offset, "STOR %s", path)
 	if err != nil {
@@ -966,6 +1042,11 @@ func (c *ServerConn) StorFrom(path string, r io.Reader, offset uint64) error {
 // io.Reader is appended. Otherwise, a new file is created with that content.
 //
 // Hint: io.Pipe() can be used if an io.Writer is required.
+//
+// Append 发出 APPE FTP 命令以将文件存储到远程 FTP 服务器。
+// 如果给定路径的文件已存在，则附加 io.Reader 的内容。 否则，将使用该内容创建一个新文件。
+//
+// 提示：如果需要 io.Writer，可以使用 io.Pipe()。
 func (c *ServerConn) Append(path string, r io.Reader) error {
 	conn, err := c.cmdDataConnFrom(0, "APPE %s", path)
 	if err != nil {
@@ -1002,6 +1083,7 @@ func (c *ServerConn) Rename(from, to string) error {
 
 // Delete issues a DELE FTP command to delete the specified file from the
 // remote FTP server.
+// 从远端 FTP server 删除指定文件
 func (c *ServerConn) Delete(path string) error {
 	_, _, err := c.cmd(StatusRequestedFileActionOK, "DELE %s", path)
 	return err
@@ -1009,6 +1091,7 @@ func (c *ServerConn) Delete(path string) error {
 
 // RemoveDirRecur deletes a non-empty folder recursively using
 // RemoveDir and Delete
+// RemoveDirRecur 使用 RemoveDir 和 Delete 递归删除非空文件夹
 func (c *ServerConn) RemoveDirRecur(path string) error {
 	err := c.ChangeDir(path)
 	if err != nil {
@@ -1049,6 +1132,7 @@ func (c *ServerConn) RemoveDirRecur(path string) error {
 
 // MakeDir issues a MKD FTP command to create the specified directory on the
 // remote FTP server.
+// MakeDir 发出 MKD FTP 命令以在远程 FTP 服务器上创建指定目录。
 func (c *ServerConn) MakeDir(path string) error {
 	_, _, err := c.cmd(StatusPathCreated, "MKD %s", path)
 	return err
@@ -1056,12 +1140,14 @@ func (c *ServerConn) MakeDir(path string) error {
 
 // RemoveDir issues a RMD FTP command to remove the specified directory from
 // the remote FTP server.
+// RemoveDir 发出 RMD FTP 命令以从远程 FTP 服务器中删除指定的目录。
 func (c *ServerConn) RemoveDir(path string) error {
 	_, _, err := c.cmd(StatusRequestedFileActionOK, "RMD %s", path)
 	return err
 }
 
 // Walk prepares the internal walk function so that the caller can begin traversing the directory
+// Walk 准备内部 walk 函数，以便调用者可以开始遍历目录
 func (c *ServerConn) Walk(root string) *Walker {
 	w := new(Walker)
 	w.serverConn = c
@@ -1079,12 +1165,14 @@ func (c *ServerConn) Walk(root string) *Walker {
 // NoOp issues a NOOP FTP command.
 // NOOP has no effects and is usually used to prevent the remote FTP server to
 // close the otherwise idle connection.
+// NoOp 发出 NOOP FTP 命令。 NOOP 没有任何作用，通常用于防止远程 FTP 服务器关闭原本空闲的连接。
 func (c *ServerConn) NoOp() error {
 	_, _, err := c.cmd(StatusCommandOK, "NOOP")
 	return err
 }
 
 // Logout issues a REIN FTP command to logout the current user.
+// Logout 发出 REIN FTP 命令来注销当前用户。
 func (c *ServerConn) Logout() error {
 	_, _, err := c.cmd(StatusReady, "REIN")
 	return err
@@ -1092,6 +1180,7 @@ func (c *ServerConn) Logout() error {
 
 // Quit issues a QUIT FTP command to properly close the connection from the
 // remote FTP server.
+// Quit 发出 QUIT FTP 命令以正确关闭与远程 FTP 服务器的连接。
 func (c *ServerConn) Quit() error {
 	var errs *multierror.Error
 
