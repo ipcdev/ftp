@@ -136,6 +136,7 @@ func Dial(addr string, options ...DialOption) (*ServerConn, error) {
 			defer cancel()
 		}
 
+		// FTPS 隐式 SSL
 		if do.tlsConfig != nil && !do.explicitTLS {
 			dialFunc = func(network, address string) (net.Conn, error) {
 				tlsDialer := &tls.Dialer{
@@ -145,7 +146,7 @@ func Dial(addr string, options ...DialOption) (*ServerConn, error) {
 				return tlsDialer.DialContext(ctx, network, addr)
 			}
 		} else {
-
+			// FTP 或者 FTPS 显示 SSL
 			dialFunc = func(network, address string) (net.Conn, error) {
 				return do.dialer.DialContext(ctx, network, addr)
 			}
@@ -175,7 +176,9 @@ func Dial(addr string, options ...DialOption) (*ServerConn, error) {
 		return nil, err
 	}
 
+	// 显示 TLS
 	if do.explicitTLS {
+		// TLS 认证
 		if err := c.authTLS(); err != nil {
 			_ = c.Quit()
 			return nil, err
